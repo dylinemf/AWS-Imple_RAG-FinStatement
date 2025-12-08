@@ -1,0 +1,31 @@
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* TODO: Add your custom styles here */ 
+:root {
+  --main-bg: #e3ebf6;
+  --main-accent: #0071b7;
+  --bubble-user: linear-gradient(90deg,#74c0fc,#e3f2fd);
+  --bubble-assist: linear-gradient(100deg,#d7f6e1 70%,#f4fbf6 130%);
+  --button-grad: linear-gradient(90deg,#38b6b8,#12c2e9 80%);
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
