@@ -1,10 +1,5 @@
 # RAG-Financial-Statement — Additional Notes
 
-This project is based on [InterOpera-Apps/coding-test-2nd](https://github.com/InterOpera-Apps/coding-test-2nd).
-
-**For setup, usage, and general documentation, please refer to the [original repository](https://github.com/InterOpera-Apps/coding-test-2nd).**  
-Below are the additional features and differences in this repository:
-
 - **Project Structure**
 ```
 RAG-Financial-Statement/
@@ -87,5 +82,3 @@ RAG-Financial-Statement/
   - Styling for each React component (chat, file upload, etc) is implemented as a CSS module for better maintainability.
 
 ---
-
-> Again: for overall instructions, setup, and original API routes, see the [main repo documentation](https://github.com/InterOpera-Apps/coding-test-2nd).
