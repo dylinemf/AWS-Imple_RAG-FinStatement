@@ -128,8 +128,8 @@ LLM_MODEL="distilbert-base-cased-distilled-squad"           # gpt-3.5-turbo or g
 DATABASE_URL=postgresql+psycopg2://postgres:password123@127.0.0.1:5435/rag_db
 PDF_UPLOAD_BUCKET=asgmt-aws-2025
 
-# --- FILL IN FROM VOCAREUM / AWS ---
-AWS_ACCESS_KEY_ID="youraccesskeyid
+# --- FILL IN THESE VARIABLES FROM VOCAREUM / AWS ---
+AWS_ACCESS_KEY_ID=youraccesskeyid
 AWS_SECRET_ACCESS_KEY=yoursecret
 AWS_SESSION_TOKEN=
 AWS_REGION=yourchosenregion
