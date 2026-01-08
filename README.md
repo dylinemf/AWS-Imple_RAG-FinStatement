@@ -1,91 +1,176 @@
-# RAG-Financial-Statement — Additional Notes
+# RAG-based Financial Statement Q&A System
 
-This project is based on [InterOpera-Apps/coding-test-2nd](https://github.com/InterOpera-Apps/coding-test-2nd).
+This repository contains the source code for a full-stack **Retrieval Augmented Generation (RAG)** application I developed. It's designed to provide intelligent, source-backed answers to questions about financial documents. Think of it as a private ChatGPT for your financial statements.
 
-**For setup, usage, and general documentation, please refer to the [original repository](https://github.com/InterOpera-Apps/coding-test-2nd).**  
-Below are the additional features and differences in this repository:
-
-- **Project Structure**
-```
-RAG-Financial-Statement/
-├── backend/
-│ ├── main.py                 # FastAPI application
-│ ├── models/                 # Data models
-│ │ └── schemas.py            # Pydantic schemas
-│ ├── services/               # RAG service logic
-│ │ ├── pdf_processor.py      # PDF processing and chunking
-│ │ ├── providers.py          # Embeddings and LLM management (HF & OpenAI)
-│ │ ├── vector_store.py       # Vector database integration
-│ │ └── rag_pipeline.py       # RAG pipeline
-│ ├── requirements.txt        # Python dependencies
-│ └── config.py               # Configuration file
-├── frontend/
-│ ├── pages/                  # Next.js pages
-│ │ ├── index.tsx             # Main page
-│ │ └── _app.tsx              # App component
-│ ├── components/             # React components
-│ │ ├── ChatInterface.tsx
-│ │ └── FileUpload.tsx
-│ ├── hooks/                        # Hooks
-│ │ └── useKnowledgeBase.ts         # Trigger based on batch process
-│ ├── styles/                       # CSS files
-│ │ └── globals.css                 # Global styles
-│ │ └── ChatInterface.module.css    # Module style
-│ │ └── FileUpload.module.css       # Module style
-│ ├── public/                       # folder for public usecases like icon
-│ │ └── favicon.png
-│ ├── package.json                  # Node.js dependencies
-│ ├── tsconfig.json                 # TypeScript configuration
-│ ├── next.config.js                # Next.js configuration
-│ ├── next-env.d.ts                 # Next.js type definitions
-│ └── .eslintrc.json                # ESLint configuration
-├── data/
-│ └── sample.pdf
-└── README.md
-```
-
-## 🚩 What's Different in This Repo
-
-- **Modular Provider Management (`providers.py`):**
-  - Added a `providers.py` file to make embedding and LLM provider (HuggingFace or OpenAI) selection more modular and extensible. You just configure via env variables.
-
-- **Not Using `_retrieve_documents`:**
-  - The function `_retrieve_documents` from the original repo is not used here.
-  - All retrieval is handled in `vector_store.py` via `similarity_search`, called directly from the RAG pipeline (`generate_answer`). So there's no dependency on that function.
-
-- **Frontend Response Formatting:**
-  - Added `react-markdown`, `remark-math`, and `katex` to render model responses with markdown and math formatting, making answers much cleaner and easier to read.
-
-- **Embeddings & LLM Provider Choice:**
-  - You can select either HuggingFace or OpenAI for both embeddings and LLM, simply by changing values in the `.env` file (see `.env`). To use OpenAI, supply your own `OPENAI_API_KEY`.
-  
-  Sample `.env`:
-  ```
-  OPENAI_API_KEY= """                         # Fill with our own OpenAI API-Key
-  VECTOR_DB_PATH="./vector_store"             # A folder to store vectorstore, already a default
-  VECTOR_DB_TYPE="chromadb"                   # 'chromadb' also already a default
-  PDF_UPLOAD_PATH="../data"                   # A folder to store the uploaded PDF
-  LLM_TEMPERATURE=0.1
-  MAX_TOKENS=1000
-  CHUNK_SIZE=1000
-  CHUNK_OVERLAP=200
-  RETRIEVAL_K=5
-  SIMILARITY_THRESHOLD=0.7
-  EMBEDDING_PROVIDER="openai"                 # openai or huggingface
-  LLM_PROVIDER="openai"                       # openai or huggingface
-  EMBEDDING_MODEL="text-embedding-ada-002"    # text-embedding-ada-002 or model sentence-transformers/all-MiniLM-L6-v2
-  LLM_MODEL="gpt-4-turbo"                     # gpt-3.5-turbo or gpt-4-turbo or distilbert-base-cased-distilled-squad
-  ```
-
-- **Better Prompt Engineering:**
-  - In `_generate_llm_response` (see `rag_pipeline.py`), the prompt is improved: if an answer can be calculated manually from data in the context, the model is instructed to do the math and show the steps (with LaTeX/markdown), always showing the final result in bold at the top.
-
-- **Knowledge Base State Hook:**
-  - Added a `useKnowledgeBase` React hook in the frontend to handle state changes when PDF processing/batching is done, so the chat interface is only enabled when knowledge base is ready.
-
-- **Component-level Styling:**
-  - Styling for each React component (chat, file upload, etc) is implemented as a CSS module for better maintainability.
+This project serves as a portfolio piece to demonstrate a practical, end-to-end implementation of a modern AI-powered application, from frontend interaction to backend processing and cloud deployment.
 
 ---
 
-> Again: for overall instructions, setup, and original API routes, see the [main repo documentation](https://github.com/InterOpera-Apps/coding-test-2nd).
+## 🏗️ Architecture & Flow
+
+The system is split into a frontend, a backend, and external services, ensuring a clean separation of concerns.
+
+### Application Flow
+
+Here's a breakdown of how data moves through the system, from UI to AI and back.
+
+```mermaid
+graph TD
+    subgraph "Frontend (Next.js)"
+        direction LR
+        A[FileUpload Component] -- "Shows progress" --> F[Progress Bar UI]
+        A -- "POST /api/upload" --> D{FastAPI Backend API}
+        
+        C[Chat Interface] -- "Manages UI state" --> B[useKnowledgeBase Hook]
+        C -- "POST /api/chat" --> D
+        D -- "Answer Stream" --> E["Response Rendering (react-markdown, KaTeX)"]
+        E --> C
+    end
+
+    subgraph "Backend (FastAPI)"
+        direction TB
+        subgraph "API Endpoints"
+            D -- "/upload" --> G["PDF Processor (Async)"]
+            D -- "/chat" --> H(RAG Pipeline)
+        end
+        
+        G -- "Chunks" --> H
+
+        subgraph "RAG Core"
+            H -- "Text to embed" --> I{Provider Manager}
+            I -- "Selects provider from .env" --> J[Embedding Service]
+            H -- "Prompt + Context" --> I
+            I -- "Selects provider from .env" --> K[LLM Service]
+
+            J -- "Generates Embeddings" --> L[("PostgreSQL w/ pgvector")]
+            H -- "Stores & Retrieves" --> L
+        end
+
+        H -- "Streams final answer" --> D
+    end
+
+    subgraph "External Services (Configurable)"
+        J --> M[OpenAI Embeddings]
+        J --> N[HuggingFace Embeddings]
+        K --> O[OpenAI LLM]
+        K --> P[HuggingFace LLM]
+    end
+
+    style D fill:#00a8e8,stroke:#333,stroke-width:2px,color:white
+    style I fill:#f5a623,stroke:#333,stroke-width:2px,color:white
+```
+
+1.  **Document Upload & Processing**: A user uploads a PDF. The frontend shows a real-time progress bar while the file is sent to the backend. The backend then asynchronously processes the document: it's parsed, split into chunks, and converted into vector embeddings.
+2.  **Vector Storage**: These embeddings are stored in a **PostgreSQL** database supercharged with the `pgvector` extension, which allows for efficient similarity searches.
+3.  **Q&A Interaction**: A user asks a question. The backend embeds the query, searches the PostgreSQL database for the most relevant document chunks, and then passes the question along with the retrieved context to an LLM.
+4.  **Answer Generation**: The LLM generates an answer based on the provided context, which is then streamed back to the UI. Crucially, the answer is presented alongside the specific sources from the document, allowing for easy verification.
+
+### AWS Deployment Architecture
+
+For deployment, I designed a simple yet effective architecture for the AWS Sandbox environment. It's optimized for the limitations of the sandbox but demonstrates a solid, scalable foundation.
+
+![AWS Deployment Architecture](AWS%20Final%20Project%20Architecture.png)
+
+> **A quick note on this setup:** This diagram shows a simplified architecture tailored for an AWS Sandbox. It's a cost-effective and practical approach for that environment. I also have a more detailed report and a video demo that walks through a more robust, production-ready design. If you're interested in seeing it, please **open an issue in this repo with your email address**, and I'll be happy to share it with you. I believe in being transparent about design choices, and this felt like the most honest way to represent the work.
+
+---
+
+## ✨ Key Features
+
+-   **Interactive Chat Interface**: A clean, responsive UI built with Next.js for a smooth user experience.
+-   **Real-Time Processing Feedback**: The UI displays a loading indicator while a document is being chunked and embedded, giving the user clear feedback.
+-   **Source-Backed Answers**: Every answer generated by the AI is accompanied by citations from the original document, ensuring transparency and trust.
+-   **Modular AI Providers**: Easily switch between **OpenAI** and open-source **HuggingFace** models for both embeddings and generation through simple configuration changes.
+-   **Robust Vector Storage**: Utilizes **PostgreSQL** with `pgvector` for a scalable and persistent vector store.
+-   **Cloud-Native File Management**: Leverages **AWS S3** for durable and secure storage of uploaded documents.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer                  | Technology                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Frontend**           | [Next.js](https://nextjs.org/), [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/) |
+| **Backend**            | [FastAPI](https://fastapi.tiangolo.com/), [LangChain](https://www.langchain.com/), [Pydantic](https://docs.pydantic.dev/latest/)                                            |
+| **Database & Storage** | [PostgreSQL](https://www.postgresql.org/) with [pgvector](https://github.com/pgvector/pgvector), [AWS S3](https://aws.amazon.com/s3/), [Docker](https://www.docker.com/)              |
+| **AI Models**          | [OpenAI](https://openai.com/), [HuggingFace](https://huggingface.co/) (Sentence Transformers)                                   |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+-   [Docker](https://www.docker.com/products/docker-desktop/) & Docker Compose
+-   [Python](https://www.python.org/downloads/) (3.10+)
+-   [Node.js](https://nodejs.org/en) (18+)
+-   An AWS account with an S3 bucket
+
+### 1. Environment Configuration
+
+Clone the repository and create a `.env` file inside the `backend` directory. This is where you'll store all your secret keys and configurations.
+
+**`backend/.env.example`:**
+```sample env
+OPENAI_API_KEY= ""                          # Fill with our own OpenAI API-Key
+LLM_TEMPERATURE=0.1
+MAX_TOKENS=1000
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+RETRIEVAL_K=5
+SIMILARITY_THRESHOLD=0.7
+EMBEDDING_PROVIDER="huggingface"                            # openai or huggingface
+LLM_PROVIDER="huggingface"                                  # openai or huggingface
+EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"    # text-embedding-ada-002 or model sentence-transformers/all-MiniLM-L6-v2
+LLM_MODEL="distilbert-base-cased-distilled-squad"           # gpt-3.5-turbo or gpt-4-turbo or distilbert-base-cased-distilled-squad
+
+
+DATABASE_URL=postgresql+psycopg2://postgres:password123@127.0.0.1:5435/rag_db
+PDF_UPLOAD_BUCKET=asgmt-aws-2025
+
+# --- FILL IN FROM VOCAREUM / AWS ---
+AWS_ACCESS_KEY_ID="youraccesskeyid
+AWS_SECRET_ACCESS_KEY=yoursecret
+AWS_SESSION_TOKEN=
+AWS_REGION=yourchosenregion
+```
+
+### 2. Running the Application
+
+The backend and database are containerized for easy setup.
+
+```bash
+# 1. Start the backend and PostgreSQL database with Docker
+cd backend/
+docker-compose up --build -d
+
+# 2. Set up the frontend in a new terminal
+cd ../frontend/
+npm install
+npm run dev
+```
+
+-   The **Frontend UI** will be available at `http://localhost:3000`.
+-   The **Backend API** will be running at `http://localhost:8000`.
+
+### 3. Uploading Your First Document
+
+Before you can chat, you need to provide a document. You can do this via the web interface or by using a tool like `curl`.
+
+```bash
+# Example curl command to upload a sample PDF
+curl -X POST "http://localhost:8000/api/upload" \
+     -F "file=@../data/sample.pdf"
+```
+
+Once the upload is complete and processing is done, you can start asking questions!
+
+---
+
+## Future Work
+
+While this project is fully functional, I have a few ideas for how it could be extended:
+
+-   **Fine-Tune Open-Source Models**: To improve performance and reduce reliance on proprietary services, I'd like to fine-tune an open-source model (like one from the Hugging Face hub) specifically on financial statement analysis. This could lead to more accurate, domain-aware answers and reduce hallucinations.
+-   **Advanced Multi-Tenancy**: The current system is designed for a single knowledge base at a time. A great next step would be to build out a true multi-tenant architecture, where different users or organizations can have their own secure and isolated document sets. This would involve more sophisticated data handling and training the AI to understand context across different document formats.
+-   **Enhanced UI/UX**: I envision adding features like visually highlighting the source text within a PDF viewer directly in the UI and creating a dashboard for managing uploaded documents.

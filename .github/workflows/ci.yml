@@ -1,0 +1,37 @@
+name: Backend CI & Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip' # cache pip dependencies
+
+    - name: Install dependencies and security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backend/requirements.txt
+        pip install bandit safety
+
+    - name: Run Bandit Security Scan
+      working-directory: ./backend
+      run: |
+        echo "Running Bandit to scan for common security issues..."
+        bandit -r . --skip B101,B608 -ll
+
+    - name: Run Safety Dependency Check
+      run: |
+        echo "Running Safety to check for vulnerable dependencies..."
+        safety check --file=backend/requirements.txt --full-report
